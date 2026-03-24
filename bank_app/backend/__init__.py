@@ -16,6 +16,6 @@ def create_app():
 
     # Register all API routes under the /api prefix (e.g. /api/accounts).
     from routes import bp
-    app.register_blueprint(bp, url_prefix='/api')
+    app.register_blueprint(bp, url_prefix='/api') # avoid circular import
 
     return app
