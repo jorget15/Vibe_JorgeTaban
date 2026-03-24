@@ -1,9 +1,23 @@
+"""
+Account Service Module
+----------------------
+This module provides service-layer functions for managing bank accounts, including:
+- Creating accounts and users
+- Retrieving account details
+- Handling deposits and withdrawals
+- Fetching transaction history
+It acts as an interface between the API/routes and the repository/database layer, ensuring business logic and validation are applied.
+"""
 import repos.account_repo as account_repo
 import repos.user_repo as user_repo
 import repos.transaction_repo as transaction_repo
 from db.database import get_db
 
 def create_account(name, email, account_type):
+    """
+    Create a new account for a user. If the user does not exist, create the user first.
+    Returns account details as a dictionary.
+    """
     conn = get_db()
     try:
         user = user_repo.get_user_by_email(conn, email)
@@ -16,6 +30,10 @@ def create_account(name, email, account_type):
         conn.close()
 
 def get_account(account_id):
+    """
+    Retrieve account details by account ID, including user name and balance.
+    Returns account information as a dictionary or None if not found.
+    """
     conn = get_db()
     try:
         account = account_repo.get_account_by_id(conn, account_id)
@@ -32,6 +50,12 @@ def get_account(account_id):
         conn.close()
 
 def deposit(account_id, amount):
+    """
+    Deposit a positive amount into the specified account.
+    Updates the account balance and records the transaction.
+    Returns updated account information as a dictionary.
+    Raises ValueError for invalid input or missing account.
+    """
     if amount <= 0:
         raise ValueError("Deposit amount must be positive")
     conn = get_db()
@@ -48,6 +72,12 @@ def deposit(account_id, amount):
         conn.close()
 
 def withdraw(account_id, amount):
+    """
+    Withdraw a positive amount from the specified account.
+    Checks for sufficient funds, updates balance, and records the transaction.
+    Returns updated account information as a dictionary.
+    Raises ValueError for invalid input, missing account, or insufficient funds.
+    """
     if amount <= 0:
         raise ValueError("Withdrawal amount must be positive")
     conn = get_db()
@@ -66,6 +96,10 @@ def withdraw(account_id, amount):
         conn.close()
 
 def get_transactions(account_id):
+    """
+    Retrieve a list of transactions for the specified account ID.
+    Returns a list of transaction dictionaries with id, type, amount, and date.
+    """
     conn = get_db()
     try:
         transactions = transaction_repo.get_transactions_by_account_id(conn, account_id)

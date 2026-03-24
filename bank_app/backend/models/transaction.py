@@ -1,5 +1,5 @@
-# Entity representing a single deposit or withdrawal transaction.
-# Every time money moves in or out of an Account, a Transaction record is created.
+''' Entity representing a single deposit or withdrawal transaction.
+Every time money moves in or out of an Account, a Transaction record is created.'''
 class Transaction:
     def __init__(self, txn_id, account_id, txn_type, amount, created_at=None):
         self.txn_id = txn_id          # primary key in the transactions table

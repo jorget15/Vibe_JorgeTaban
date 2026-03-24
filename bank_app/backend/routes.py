@@ -1,7 +1,7 @@
-# Controller — maps HTTP requests to AccountService methods.
-# This file only handles HTTP concerns: reading request data, calling the service,
-# and returning JSON responses with the correct status codes.
-# No business logic or SQL lives here.
+''' Controller — maps HTTP requests to AccountService methods.
+    This file only handles HTTP concerns: reading request data, calling the service,
+    and returning JSON responses with the correct status codes.
+    No business logic or SQL lives here. '''
 from flask import Blueprint, request, jsonify
 import services.account_service as account_service
 
