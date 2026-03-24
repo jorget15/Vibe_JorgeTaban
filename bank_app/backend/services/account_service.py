@@ -1,53 +1,58 @@
 """
 Account Service Module
 ----------------------
-This module provides service-layer functions for managing bank accounts, including:
-- Creating accounts and users
-- Retrieving account details
-- Handling deposits and withdrawals
-- Fetching transaction history
-It acts as an interface between the API/routes and the repository/database layer, ensuring business logic and validation are applied.
+Service layer for managing bank accounts.
+Enforces all business rules (positive amounts, sufficient funds, account existence)
+and coordinates across repos within a single session so every operation is atomic —
+either everything commits or everything rolls back.
 """
-import repos.account_repo as account_repo
-import repos.user_repo as user_repo
-import repos.transaction_repo as transaction_repo
+from repositories.account_repo import AccountRepo
+from repositories.user_repo import UserRepo
+from repositories.transaction_repo import TransactionRepo
 from db.database import get_db
+
+account_repo = AccountRepo()
+user_repo = UserRepo()
+transaction_repo = TransactionRepo()
 
 def create_account(name, email, account_type):
     """
     Create a new account for a user. If the user does not exist, create the user first.
     Returns account details as a dictionary.
     """
-    conn = get_db()
+    session = get_db()
     try:
-        user = user_repo.get_user_by_email(conn, email)
+        user = user_repo.get_user_by_email(session, email)
         if not user:
-            user = user_repo.add_user(conn, name, email)
-        account = account_repo.add_account(conn, user.user_id, account_type)
-        conn.commit()
-        return {"accountId": account.account_id, "accountType": account.account_type, "balance": account.balance}
+            user = user_repo.add_user(session, name, email)
+        account = account_repo.add_account(session, user.user_id, account_type)
+        session.commit()
+        return {"accountId": account.account_id, "accountType": account.account_type, "balance": float(account.balance)}
+    except:
+        session.rollback()
+        raise
     finally:
-        conn.close()
+        session.close()
 
 def get_account(account_id):
     """
     Retrieve account details by account ID, including user name and balance.
     Returns account information as a dictionary or None if not found.
     """
-    conn = get_db()
+    session = get_db()
     try:
-        account = account_repo.get_account_by_id(conn, account_id)
+        account = account_repo.get_account_by_id(session, account_id)
         if not account:
             return None
-        user = user_repo.get_user_by_id(conn, account.user_id)
+        user = user_repo.get_user_by_id(session, account.user_id)
         return {
             "accountId": account.account_id,
             "userName": user.name,
-            "balance": account.balance,
+            "balance": float(account.balance),
             "accountType": account.account_type
         }
     finally:
-        conn.close()
+        session.close()
 
 def deposit(account_id, amount):
     """
@@ -58,18 +63,21 @@ def deposit(account_id, amount):
     """
     if amount <= 0:
         raise ValueError("Deposit amount must be positive")
-    conn = get_db()
+    session = get_db()
     try:
-        account = account_repo.get_account_by_id(conn, account_id)
+        account = account_repo.get_account_by_id(session, account_id)
         if not account:
             raise ValueError("Account not found")
-        new_balance = account.balance + amount
-        account_repo.update_balance(conn, account_id, new_balance)
-        transaction_repo.add_transaction(conn, account_id, 'DEPOSIT', amount)
-        conn.commit()
+        new_balance = float(account.balance) + amount
+        account_repo.update_balance(session, account_id, new_balance)
+        transaction_repo.add_transaction(session, account_id, 'DEPOSIT', amount)
+        session.commit()
         return {"accountId": account_id, "balance": new_balance}
+    except:
+        session.rollback()
+        raise
     finally:
-        conn.close()
+        session.close()
 
 def withdraw(account_id, amount):
     """
@@ -80,37 +88,40 @@ def withdraw(account_id, amount):
     """
     if amount <= 0:
         raise ValueError("Withdrawal amount must be positive")
-    conn = get_db()
+    session = get_db()
     try:
-        account = account_repo.get_account_by_id(conn, account_id)
+        account = account_repo.get_account_by_id(session, account_id)
         if not account:
             raise ValueError("Account not found")
-        if account.balance < amount:
+        if float(account.balance) < amount:
             raise ValueError("Insufficient funds")
-        new_balance = account.balance - amount
-        account_repo.update_balance(conn, account_id, new_balance)
-        transaction_repo.add_transaction(conn, account_id, 'WITHDRAW', amount)
-        conn.commit()
+        new_balance = float(account.balance) - amount
+        account_repo.update_balance(session, account_id, new_balance)
+        transaction_repo.add_transaction(session, account_id, 'WITHDRAW', amount)
+        session.commit()
         return {"accountId": account_id, "balance": new_balance}
+    except:
+        session.rollback()
+        raise
     finally:
-        conn.close()
+        session.close()
 
 def get_transactions(account_id):
     """
     Retrieve a list of transactions for the specified account ID.
     Returns a list of transaction dictionaries with id, type, amount, and date.
     """
-    conn = get_db()
+    session = get_db()
     try:
-        transactions = transaction_repo.get_transactions_by_account_id(conn, account_id)
+        transactions = transaction_repo.get_transactions_by_account_id(session, account_id)
         return [
             {
                 "txnId": t.txn_id,
                 "type": t.txn_type,
-                "amount": t.amount,
-                "date": t.created_at[:10]
+                "amount": float(t.amount),
+                "date": str(t.created_at)[:10]
             }
             for t in transactions
         ]
     finally:
-        conn.close()
+        session.close()

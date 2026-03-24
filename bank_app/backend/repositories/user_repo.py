@@ -1,0 +1,24 @@
+# Data access for the users table using SQLAlchemy ORM.
+# Repositories are the only layer that talks to the DB — no SQL lives anywhere else.
+# All methods receive a session from the service layer so multiple repo calls
+# can share one transaction and be committed or rolled back together.
+from models.user import User
+
+class UserRepo:
+    def get_user_by_email(self, session, email):
+        # Look up a user by email. Used to avoid creating duplicate users.
+        # Returns a User object, or None if not found.
+        return session.query(User).filter_by(email=email).first()
+
+    def get_user_by_id(self, session, user_id):
+        # Look up a user by their primary key.
+        # Returns a User object, or None if not found.
+        return session.query(User).filter_by(user_id=user_id).first()
+
+    def add_user(self, session, name, email):
+        # Insert a new user row and return the User object with the generated user_id.
+        # session.flush() assigns the ID without committing.
+        user = User(name=name, email=email)
+        session.add(user)
+        session.flush()
+        return user

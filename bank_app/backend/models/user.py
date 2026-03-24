@@ -1,8 +1,14 @@
-'''Entity representing a bank user.
-A User owns one or more Accounts. Each Account links back to a User via user_id. '''
-class User:
-    def __init__(self, user_id, name, email, created_at=None):
-        self.user_id = user_id      # primary key in the users table
-        self.name = name            # full name entered at account creation
-        self.email = email          # unique identifier — used to avoid duplicate users
-        self.created_at = created_at  # timestamp set automatically by the database
+''' ORM model for the users table.
+A User owns one or more Accounts. Each Account links back to a User via user_id.
+Inherits from Base so SQLAlchemy knows to include this table in create_all(). '''
+from sqlalchemy import Column, Integer, String, TIMESTAMP
+from sqlalchemy.sql import func
+from db.database import Base
+
+class User(Base):
+    __tablename__ = 'users'
+
+    user_id    = Column(Integer, primary_key=True, autoincrement=True)
+    name       = Column(String(100))
+    email      = Column(String(100), unique=True)
+    created_at = Column(TIMESTAMP, server_default=func.now())
