@@ -4,7 +4,7 @@
 # can share one transaction and be committed or rolled back together.
 from models.account import Account
 
-class AccountRepo:
+class AccountRepo: 
     def add_account(self, session, user_id, account_type):
         # Insert a new account row with a starting balance of 0.
         # session.flush() assigns the generated account_id without committing,
