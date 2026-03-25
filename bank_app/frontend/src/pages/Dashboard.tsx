@@ -92,7 +92,7 @@ export default function Dashboard() {
         {/* Auth prompt */}
         <div className="bg-citi-card border border-citi-border rounded-xl p-8 text-center shadow-sm">
           <p className="text-citi-muted text-4xl mb-4">×</p>
-          <p className="text-citi-heading font-semibold text-lg mb-1">Sign in to view your account</p>
+          <p className="text-citi-heading font-semibold text-lg mb-1">Sign in to view your account info</p>
           <p className="text-citi-muted text-sm">Your balance, transactions, and actions are hidden until you log in.</p>
         </div>
       </main>
