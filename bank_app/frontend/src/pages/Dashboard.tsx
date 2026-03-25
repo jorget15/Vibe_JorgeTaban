@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import { toast } from 'react-toastify'
 import type { RootState } from '../store'
 import { deposit, withdraw, transfer, clearError } from '../store/accountSlice'
+import TransactionDrawer from '../components/TransactionDrawer'
 
 export default function Dashboard() {
   const dispatch  = useDispatch()
@@ -13,6 +14,7 @@ export default function Dashboard() {
   const [withdrawAmt,  setWithdrawAmt]  = useState('')
   const [transferAmt,  setTransferAmt]  = useState('')
   const [recipient,    setRecipient]    = useState('')
+  const [drawerOpen,   setDrawerOpen]   = useState(false)
 
   // Track transaction count so we can detect when a new one is added (= success)
   const prevTxnCount = useRef(transactions.length)
@@ -106,7 +108,7 @@ export default function Dashboard() {
           Welcome back, {username}
         </p>
         <p className="text-5xl font-bold text-citi-heading mt-2">
-          ${balance.toFixed(2)}
+          ${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </p>
         <p className="text-citi-muted text-sm mt-2">Available balance · Checking</p>
       </div>
@@ -190,23 +192,35 @@ export default function Dashboard() {
 
       {/* Transaction history */}
       <div className="bg-citi-card border border-citi-border rounded-xl shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-citi-border">
+        <div className="px-6 py-4 border-b border-citi-border flex items-center justify-between">
           <h2 className="text-citi-heading font-semibold text-lg">Recent Transactions</h2>
+          <button
+            onClick={() => setDrawerOpen(true)}
+            className="text-citi-action text-sm font-medium hover:underline"
+          >
+            View all
+          </button>
         </div>
         <ul className="divide-y divide-citi-border">
-          {transactions.map((txn) => (
+          {transactions.slice(0, 10).map((txn) => (
             <li key={txn.id} className="px-6 py-4 flex justify-between items-center transition-colors duration-150 hover:bg-citi-surface">
               <div>
                 <p className="text-citi-text text-sm font-medium">{txn.description}</p>
                 <p className="text-citi-muted text-xs mt-0.5">{txn.date}</p>
               </div>
               <span className={`font-semibold text-sm ${typeStyles[txn.type]}`}>
-                {txn.type === 'deposit' ? '+' : '−'} ${txn.amount.toFixed(2)}
+                {txn.type === 'deposit' ? '+' : '−'} ${txn.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </li>
           ))}
         </ul>
       </div>
+
+      <TransactionDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        transactions={transactions}
+      />
 
     </main>
   )

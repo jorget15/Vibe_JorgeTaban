@@ -4,7 +4,7 @@
 import { createSlice } from '@reduxjs/toolkit'
 import type { PayloadAction } from '@reduxjs/toolkit'
 
-interface Transaction {
+export interface Transaction {
   id: number
   type: 'deposit' | 'withdrawal' | 'transfer'
   amount: number
@@ -17,6 +17,9 @@ interface AccountState {
   error: string | null
   transactions: Transaction[]
 }
+
+// Stores the most recent 100; dashboard renders only the latest 10
+const MAX_TRANSACTIONS = 100
 
 const initialState: AccountState = {
   balance: 5000.00,
@@ -42,6 +45,7 @@ const accountSlice = createSlice({
         date: new Date().toISOString().slice(0, 10),
         description: 'Deposit',
       })
+      state.transactions = state.transactions.slice(0, MAX_TRANSACTIONS)
     },
     withdraw(state, action: PayloadAction<number>) {
       if (action.payload > state.balance) {
@@ -57,6 +61,7 @@ const accountSlice = createSlice({
         date: new Date().toISOString().slice(0, 10),
         description: 'Withdrawal',
       })
+      state.transactions = state.transactions.slice(0, MAX_TRANSACTIONS)
     },
     transfer(state, action: PayloadAction<{ amount: number; recipient: string }>) {
       if (action.payload.amount > state.balance) {
@@ -72,6 +77,7 @@ const accountSlice = createSlice({
         date: new Date().toISOString().slice(0, 10),
         description: `Sent to #${action.payload.recipient}`,
       })
+      state.transactions = state.transactions.slice(0, MAX_TRANSACTIONS)
     },
     clearError(state) {
       state.error = null
