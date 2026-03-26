@@ -1,58 +1,46 @@
-# Manages the SQLite database connection and initializes tables on first run.
-#
-# WHY SQLITE?
-# SQLite is a database engine that stores everything in a single file (bank.db).
-# Unlike MySQL or PostgreSQL, it requires no separate server process to install,
-# configure, or run — Python's standard library includes the 'sqlite3' module,
-# so no extra packages are needed either. This makes it ideal for learning
-# projects and small apps. The trade-off is that it doesn't support multiple
-# concurrent writers, so it wouldn't be the right choice for a high-traffic
-# production app — but for this project it's perfect.
-import sqlite3
+''' db/database.py — MongoDB connection setup.
+
+HOW THE CONNECTION WORKS:
+  1. load_dotenv() reads the .env file and injects MONGO_URI into the environment.
+  2. MongoClient opens a connection pool to the Atlas cluster — once at startup.
+  3. mongo_client["bank_db"] is the database handle — a pointer to our database.
+     No network call happens here; it's just saying "when I make a query, use bank_db."
+  4. get_mongo_db() returns that handle to anyone who needs it (the repositories).
+
+WHY A CONNECTION POOL?
+  MongoClient manages multiple connections internally. Each request gets a
+  connection from the pool instead of opening a new TCP connection every time.
+  This is why MongoClient is created once at module load — not once per request.
+'''
 import os
+from dotenv import load_dotenv
+from pymongo import MongoClient
 
-# Absolute path to the database file — ensures it's always found regardless of
-# which directory you run the app from.
-DB_PATH = os.path.join(os.path.dirname(__file__), 'bank.db')
+# Read .env file and load its variables into os.environ.
+# This must run before os.getenv() or the variable won't be found.
+load_dotenv()
 
-def get_db():
-    # Open and return a new database connection.
-    # row_factory = sqlite3.Row means columns can be accessed by name (e.g. row['email'])
-    # instead of by index (e.g. row[2]), which makes the code much easier to read.
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+MONGO_URI = os.getenv("MONGO_URI")
 
-def init_db():
-    # Create all tables if they don't already exist.
-    # Called once when the Flask app starts up (see __init__.py).
-    # 'CREATE TABLE IF NOT EXISTS' means this is safe to run on every startup —
-    # it won't overwrite existing data.
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.executescript('''
-        CREATE TABLE IF NOT EXISTS users (
-            user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name varchar(100),
-            email varchar(100) UNIQUE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-        CREATE TABLE IF NOT EXISTS accounts (
-            account_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            balance DECIMAL(10,2) DEFAULT 0,
-            account_type varchar(50),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(user_id)
-        );
-        CREATE TABLE IF NOT EXISTS transactions (
-            txn_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            account_id INTEGER,
-            txn_type varchar(20),
-            amount DECIMAL(10,2),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (account_id) REFERENCES accounts(account_id)
-        );
-    ''')
-    conn.commit()
-    conn.close()
+if not MONGO_URI:
+    raise RuntimeError(
+        "MONGO_URI is not set. Copy .env.example to .env and fill in your Atlas connection string."
+    )
+
+# The connection to the MongoDB cluster — created once, reused for every request.
+# serverSelectionTimeoutMS limits how long we wait to discover the cluster on startup.
+# If the URI is wrong or the cluster is unreachable, you get a clear error immediately.
+mongo_client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+
+# The database handle — equivalent to picking which database to talk to.
+# All collections (users, accounts, transactions, counters) live under bank_db.
+mongo_db = mongo_client["bank_db"]
+
+
+def get_mongo_db():
+    ''' Return the bank_db database handle.
+
+    Repositories call this in their __init__ to get a reference to the database.
+    Since mongo_db is a module-level object, this always returns the same instance —
+    there is nothing to open or close per request. '''
+    return mongo_db
