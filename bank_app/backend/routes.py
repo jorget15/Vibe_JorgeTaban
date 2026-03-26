@@ -65,6 +65,22 @@ def make_transfer(account_id):
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
 
+@bp.route('/accounts/<int:account_id>', methods=['DELETE'])
+def delete_account(account_id):
+    # Soft-delete the user who owns this account.
+    # All rows stay in the DB — only the is_deleted flag changes.
+    try:
+        result = account_service.delete_account(account_id)
+        return jsonify(result)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
+
+@bp.route('/users', methods=['GET'])
+def all_users():
+    # Admin-only: returns all users with real PII and account summaries.
+    result = account_service.get_all_users()
+    return jsonify(result)
+
 @bp.route('/accounts/<int:account_id>/transactions', methods=['GET'])
 def transactions(account_id):
     # Return the full transaction history for an account as a JSON array.

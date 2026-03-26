@@ -47,8 +47,9 @@ def get_account(account_id):
         user = user_repo.get_user_by_id(session, account.user_id)
         return {
             "accountId": account.account_id,
-            "userName": user.name,
-            "balance": float(account.balance),
+            "userName":  "Deleted User" if user.is_deleted else user.name,
+            "email":     "deleted@deleted.com" if user.is_deleted else user.email,
+            "balance":   float(account.balance),
             "accountType": account.account_type
         }
     finally:
@@ -151,6 +152,67 @@ def transfer(sender_account_id, recipient_account_id, amount):
     except:
         session.rollback()
         raise
+    finally:
+        session.close()
+
+
+def delete_account(account_id):
+    """
+    Soft-delete the user who owns the given account.
+    The user row, account row, and all transactions remain in the database
+    for audit and financial history purposes — only the is_deleted flag changes.
+    Any endpoint that returns user-facing data checks this flag and shows
+    masked values ('Deleted User', 'deleted@deleted.com') to regular users.
+    Admins querying /users still see the real name and email.
+    Raises ValueError if the account does not exist.
+    """
+    session = get_db()
+    try:
+        account = account_repo.get_account_by_id(session, account_id)
+        if not account:
+            raise ValueError("Account not found")
+        user = user_repo.soft_delete(session, account.user_id)
+        if not user:
+            raise ValueError("User not found")
+        session.commit()
+        return {"accountId": account_id, "status": "deleted"}
+    except:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def get_all_users():
+    """
+    Return all users with their real name, email, account info, and deletion status.
+    Admin-only endpoint — exposes full PII including soft-deleted users.
+    Regular-user-facing endpoints use get_account() which masks deleted users.
+    """
+    session = get_db()
+    try:
+        from models.account import Account
+        users = user_repo.get_all_users(session)
+        result = []
+        for user in users:
+            accounts = session.query(Account).filter_by(user_id=user.user_id).all()
+            result.append({
+                "userId":    user.user_id,
+                "name":      user.name,
+                "email":     user.email,
+                "isDeleted": user.is_deleted,
+                "deletedAt": str(user.deleted_at)[:10] if user.deleted_at else None,
+                "createdAt": str(user.created_at)[:10],
+                "accounts": [
+                    {
+                        "accountId":   a.account_id,
+                        "accountType": a.account_type,
+                        "balance":     float(a.balance)
+                    }
+                    for a in accounts
+                ]
+            })
+        return result
     finally:
         session.close()
 

@@ -25,3 +25,4 @@ class AccountRepo:
         account = session.query(Account).filter_by(account_id=account_id).first()
         if account:
             account.balance = new_balance
+
