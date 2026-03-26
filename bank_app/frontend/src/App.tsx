@@ -8,6 +8,7 @@ import About from './pages/About'
 import SignIn from './pages/SignIn'
 import Dashboard from './pages/Dashboard'
 import AdminDashboard from './pages/AdminDashboard'
+import Register from './pages/Register'
 import 'react-toastify/dist/ReactToastify.css'
 import './App.css'
 
@@ -24,6 +25,7 @@ function AppContent() {
         <Route path="/about"     element={<About />} />
         <Route path="/signin"    element={<SignIn />} />
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/register"  element={<Register />} />
         <Route path="/admin"     element={<AdminRoute><AdminDashboard /></AdminRoute>} />
       </Routes>
       <ToastContainer position="top-right" theme="light" autoClose={3000} />

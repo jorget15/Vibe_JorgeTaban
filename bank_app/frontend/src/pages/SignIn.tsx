@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { login } from '../store/authSlice'
 import type { RootState } from '../store'
@@ -96,6 +96,13 @@ export default function SignIn() {
             Sign In
           </button>
         </form>
+
+        <p className="mt-6 text-center text-sm text-citi-muted">
+          Don't have an account?{' '}
+          <Link to="/register" className="text-citi-action hover:underline font-medium">
+            Register
+          </Link>
+        </p>
       </div>
     </main>
   )
