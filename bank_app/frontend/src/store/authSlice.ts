@@ -5,21 +5,27 @@
 import { createSlice } from '@reduxjs/toolkit'
 import type { PayloadAction } from '@reduxjs/toolkit'
 
+export type Role = 'user' | 'admin'
+
 interface AuthState {
   isAuthenticated: boolean
   username: string | null
+  role: Role | null
   error: string | null
 }
 
 const initialState: AuthState = {
   isAuthenticated: false,
   username: null,
+  role: null,
   error: null,
 }
 
-// Hardcoded credentials — will be replaced with a real API call later.
-const HARDCODED_EMAIL = 'admin@bank.com'
-const HARDCODED_PASSWORD = 'admin123'
+// Mock accounts — will be replaced with API calls when backend is connected.
+const MOCK_ACCOUNTS = [
+  { email: 'admin@bank.com', password: 'admin123', username: 'System Admin', role: 'admin' as Role },
+  { email: 'user@bank.com',  password: 'user123',  username: 'John Doe',     role: 'user'  as Role },
+]
 
 const authSlice = createSlice({
   name: 'auth',
@@ -27,9 +33,11 @@ const authSlice = createSlice({
   reducers: {
     login(state, action: PayloadAction<{ email: string; password: string }>) {
       const { email, password } = action.payload
-      if (email === HARDCODED_EMAIL && password === HARDCODED_PASSWORD) {
+      const account = MOCK_ACCOUNTS.find(a => a.email === email && a.password === password)
+      if (account) {
         state.isAuthenticated = true
-        state.username = email
+        state.username = account.username
+        state.role = account.role
         state.error = null
       } else {
         state.error = 'Invalid email or password'
@@ -38,6 +46,7 @@ const authSlice = createSlice({
     logout(state) {
       state.isAuthenticated = false
       state.username = null
+      state.role = null
       state.error = null
     },
   },

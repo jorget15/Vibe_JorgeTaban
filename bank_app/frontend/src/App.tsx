@@ -1,33 +1,40 @@
-/* App.tsx — root of the component tree.
-   BrowserRouter enables URL-based navigation.
-   Routes maps each URL path to a page component.
-   Navbar sits outside Routes so it renders on every page. */
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { ToastContainer } from 'react-toastify'
 import Navbar from './components/Navbar'
+import ProtectedRoute from './components/ProtectedRoute'
+import AdminRoute from './components/AdminRoute'
 import Home from './pages/Home'
 import About from './pages/About'
 import SignIn from './pages/SignIn'
 import Dashboard from './pages/Dashboard'
+import AdminDashboard from './pages/AdminDashboard'
 import 'react-toastify/dist/ReactToastify.css'
 import './App.css'
 
-function App() {
+// Separated so useLocation can be called inside BrowserRouter
+function AppContent() {
+  const { pathname } = useLocation()
+  const isAdmin = pathname.startsWith('/admin')
+
   return (
-    <BrowserRouter>
-      <div className="min-h-screen bg-citi-surface">
-        <Navbar />
-        <Routes>
-          <Route path="/"          element={<Home />} />
-          <Route path="/about"     element={<About />} />
-          <Route path="/signin"    element={<SignIn />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-        </Routes>
-        {/* Toast notifications — position top-right, light theme to match the app */}
-        <ToastContainer position="top-right" theme="light" autoClose={3000} />
-      </div>
-    </BrowserRouter>
+    <div className="min-h-screen bg-citi-surface">
+      {!isAdmin && <Navbar />}
+      <Routes>
+        <Route path="/"          element={<Home />} />
+        <Route path="/about"     element={<About />} />
+        <Route path="/signin"    element={<SignIn />} />
+        <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/admin"     element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+      </Routes>
+      <ToastContainer position="top-right" theme="light" autoClose={3000} />
+    </div>
   )
 }
 
-export default App
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppContent />
+    </BrowserRouter>
+  )
+}

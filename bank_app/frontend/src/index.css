@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 /* ── Runtime CSS variables ──────────────────────────────────────────────────
    These live outside @theme so they can change at runtime.
@@ -40,6 +41,21 @@
   --color-citi-muted:   var(--citi-muted);
   --color-citi-border:  var(--citi-border);
   --color-citi-heading: var(--citi-heading);
+
+  /* Admin console — dark terminal theme, always dark */
+  --color-admin-bg:      #070d1a;
+  --color-admin-surface: #0d1526;
+  --color-admin-card:    #111e35;
+  --color-admin-border:  #1e3a5f;
+  --color-admin-accent:  #00c6ff;
+  --color-admin-amber:   #f0a500;
+  --color-admin-text:    #e2eaf8;
+  --color-admin-muted:   #5a7a9e;
+  --color-admin-green:   #00d98b;
+  --color-admin-red:     #ff4757;
+
+  /* Admin monospace font */
+  --font-admin: 'JetBrains Mono', monospace;
 }
 
 body {

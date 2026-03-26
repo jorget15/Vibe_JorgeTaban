@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { Transaction } from '../store/accountSlice'
+import Spinner from './Spinner'
 
 interface Props {
   open: boolean
@@ -17,11 +18,21 @@ const typeStyles: Record<string, string> = {
 
 export default function TransactionDrawer({ open, onClose, transactions }: Props) {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const [loadingMore, setLoadingMore] = useState(false)
 
   // Reset pagination each time the drawer opens
   useEffect(() => {
     if (open) setVisibleCount(PAGE_SIZE)
   }, [open])
+
+  function handleLoadMore() {
+    setLoadingMore(true)
+    // Simulated delay — replace with API call when backend is connected
+    setTimeout(() => {
+      setVisibleCount(c => c + PAGE_SIZE)
+      setLoadingMore(false)
+    }, 600)
+  }
 
   const visible = transactions.slice(0, visibleCount)
   const remaining = transactions.length - visibleCount
@@ -84,10 +95,11 @@ export default function TransactionDrawer({ open, onClose, transactions }: Props
               <div className="px-6 py-5">
                 {remaining > 0 ? (
                   <button
-                    onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
-                    className="w-full py-2.5 border border-citi-border rounded-lg text-citi-text text-sm font-medium hover:bg-citi-surface transition-colors"
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                    className="w-full py-2.5 border border-citi-border rounded-lg text-citi-text text-sm font-medium hover:bg-citi-surface transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                   >
-                    Load more · {remaining} remaining
+                    {loadingMore ? <Spinner size="sm" /> : `Load more · ${remaining} remaining`}
                   </button>
                 ) : (
                   <p className="text-center text-citi-muted text-xs">You've reached the beginning of your history</p>

@@ -4,6 +4,7 @@ import { toast } from 'react-toastify'
 import type { RootState } from '../store'
 import { deposit, withdraw, transfer, clearError } from '../store/accountSlice'
 import TransactionDrawer from '../components/TransactionDrawer'
+import Spinner from '../components/Spinner'
 
 export default function Dashboard() {
   const dispatch  = useDispatch()
@@ -14,7 +15,14 @@ export default function Dashboard() {
   const [withdrawAmt,  setWithdrawAmt]  = useState('')
   const [transferAmt,  setTransferAmt]  = useState('')
   const [recipient,    setRecipient]    = useState('')
-  const [drawerOpen,   setDrawerOpen]   = useState(false)
+  const [drawerOpen,     setDrawerOpen]     = useState(false)
+  const [txnsLoading,    setTxnsLoading]    = useState(true)
+
+  // Simulate initial transaction fetch — replace with API call when backend is connected
+  useEffect(() => {
+    const t = setTimeout(() => setTxnsLoading(false), 800)
+    return () => clearTimeout(t)
+  }, [])
 
   // Track transaction count so we can detect when a new one is added (= success)
   const prevTxnCount = useRef(transactions.length)
@@ -201,19 +209,25 @@ export default function Dashboard() {
             View all
           </button>
         </div>
-        <ul className="divide-y divide-citi-border">
-          {transactions.slice(0, 10).map((txn) => (
-            <li key={txn.id} className="px-6 py-4 flex justify-between items-center transition-colors duration-150 hover:bg-citi-surface">
-              <div>
-                <p className="text-citi-text text-sm font-medium">{txn.description}</p>
-                <p className="text-citi-muted text-xs mt-0.5">{txn.date}</p>
-              </div>
-              <span className={`font-semibold text-sm ${typeStyles[txn.type]}`}>
-                {txn.type === 'deposit' ? '+' : '−'} ${txn.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            </li>
-          ))}
-        </ul>
+        {txnsLoading ? (
+          <div className="flex justify-center items-center py-10">
+            <Spinner size="lg" />
+          </div>
+        ) : (
+          <ul className="divide-y divide-citi-border">
+            {transactions.slice(0, 10).map((txn) => (
+              <li key={txn.id} className="px-6 py-4 flex justify-between items-center transition-colors duration-150 hover:bg-citi-surface">
+                <div>
+                  <p className="text-citi-text text-sm font-medium">{txn.description}</p>
+                  <p className="text-citi-muted text-xs mt-0.5">{txn.date}</p>
+                </div>
+                <span className={`font-semibold text-sm ${typeStyles[txn.type]}`}>
+                  {txn.type === 'deposit' ? '+' : '−'} ${txn.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <TransactionDrawer
