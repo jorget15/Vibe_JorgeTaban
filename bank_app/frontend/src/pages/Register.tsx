@@ -1,14 +1,19 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
+import api from '../api'
 
 export default function Register() {
-  const [name,     setName]     = useState('')
-  const [email,    setEmail]    = useState('')
-  const [password, setPassword] = useState('')
-  const [confirm,  setConfirm]  = useState('')
+  const navigate = useNavigate()
 
-  function handleSubmit(e: React.FormEvent) {
+  const [name,        setName]        = useState('')
+  const [email,       setEmail]       = useState('')
+  const [accountType, setAccountType] = useState('CHECKING')
+  const [password,    setPassword]    = useState('')
+  const [confirm,     setConfirm]     = useState('')
+  const [loading,     setLoading]     = useState(false)
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
     if (!name.trim() || !email.trim() || !password || !confirm) {
@@ -24,8 +29,16 @@ export default function Register() {
       return
     }
 
-    // Placeholder — backend registration not yet implemented
-    toast.success('Account created! (backend coming soon)')
+    setLoading(true)
+    try {
+      await api.post('/accounts', { name, email, accountType, password })
+      toast.success('Account created! Please sign in.')
+      navigate('/signin')
+    } catch (err: any) {
+      toast.error(err.response?.data?.error ?? 'Registration failed.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -58,6 +71,18 @@ export default function Register() {
           </div>
 
           <div>
+            <label className="block text-citi-text text-sm font-medium mb-2">Account type</label>
+            <select
+              value={accountType}
+              onChange={(e) => setAccountType(e.target.value)}
+              className="w-full bg-citi-card border border-citi-border rounded-lg px-4 py-3 text-citi-text focus:outline-none focus:border-citi-action transition-colors"
+            >
+              <option value="CHECKING">Checking</option>
+              <option value="SAVINGS">Savings</option>
+            </select>
+          </div>
+
+          <div>
             <label className="block text-citi-text text-sm font-medium mb-2">Password</label>
             <input
               type="password"
@@ -81,9 +106,10 @@ export default function Register() {
 
           <button
             type="submit"
-            className="w-full bg-citi-action text-white font-semibold py-3 rounded-sm hover:bg-citi-blue transition-all duration-150 active:scale-95"
+            disabled={loading}
+            className="w-full bg-citi-action text-white font-semibold py-3 rounded-sm hover:bg-citi-blue transition-all duration-150 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Create account
+            {loading ? 'Creating account…' : 'Create account'}
           </button>
         </form>
 

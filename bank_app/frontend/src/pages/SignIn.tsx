@@ -2,14 +2,14 @@ import { useState, useEffect, useRef } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate, Link } from 'react-router-dom'
 import { toast } from 'react-toastify'
-import { login } from '../store/authSlice'
-import type { RootState } from '../store'
+import { loginAsync, clearError } from '../store/authSlice'
+import type { RootState, AppDispatch } from '../store'
 
 export default function SignIn() {
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
 
-  const dispatch        = useDispatch()
+  const dispatch        = useDispatch<AppDispatch>()
   const navigate        = useNavigate()
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated)
   const role            = useSelector((state: RootState) => state.auth.role)
@@ -33,8 +33,11 @@ export default function SignIn() {
   }, [isAuthenticated, role, navigate])
 
   useEffect(() => {
-    if (error) toast.error(error)
-  }, [error])
+    if (error) {
+      toast.error(error)
+      dispatch(clearError()) // clear immediately so it doesn't replay on next mount
+    }
+  }, [error, dispatch])
 
   // Intercepts the Sign In button click to detect triple-click (admin path).
   // Waits 400ms after the last click before deciding which mode to dispatch.
@@ -48,7 +51,7 @@ export default function SignIn() {
       const isTriple = clickCountRef.current >= 3
       clickCountRef.current = 0
       adminAttemptRef.current = isTriple
-      dispatch(login({ email, password }))
+      dispatch(loginAsync({ email, password }))
     }, 400)
   }
 
@@ -56,7 +59,7 @@ export default function SignIn() {
   function handleSubmit(e: React.BaseSyntheticEvent) {
     e.preventDefault()
     adminAttemptRef.current = false
-    dispatch(login({ email, password }))
+    dispatch(loginAsync({ email, password }))
   }
 
   return (

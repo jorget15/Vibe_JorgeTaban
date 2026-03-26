@@ -1,45 +1,65 @@
+/* TransactionDrawer.tsx — a slide-in panel showing the full transaction history.
+ *
+ * WHY A DRAWER INSTEAD OF A NEW PAGE?
+ *   The user is already on the Dashboard looking at their balance. Opening a
+ *   separate page would lose that context. A drawer slides in on top, lets
+ *   them scroll through history, and closes back to the same Dashboard view.
+ *
+ * PAGINATION ("Load more"):
+ *   All transactions are already in Redux memory (fetched on login).
+ *   "Load more" just reveals the next 15 from the already-loaded array —
+ *   no extra API call needed. The simulated delay (setTimeout) mimics what
+ *   a real paginated API call would feel like and can be replaced later.
+ *
+ * TRANSACTION TYPES → COLORS:
+ *   DEPOSIT / TRANSFER_IN  → green  (money coming in)
+ *   WITHDRAW / TRANSFER_OUT → red   (money going out)
+ */
 import { useState, useEffect } from 'react'
 import type { Transaction } from '../store/accountSlice'
 import Spinner from './Spinner'
 
 interface Props {
-  open: boolean
-  onClose: () => void
+  open:         boolean
+  onClose:      () => void
   transactions: Transaction[]
 }
 
 const PAGE_SIZE = 15
 
+// Maps each backend transaction type to a Tailwind text color class
 const typeStyles: Record<string, string> = {
-  deposit:    'text-green-600',
-  withdrawal: 'text-citi-red',
-  transfer:   'text-citi-action',
+  DEPOSIT:      'text-green-600',
+  WITHDRAW:     'text-citi-red',
+  TRANSFER_OUT: 'text-citi-red',
+  TRANSFER_IN:  'text-green-600',
 }
 
 export default function TransactionDrawer({ open, onClose, transactions }: Props) {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
-  const [loadingMore, setLoadingMore] = useState(false)
+  const [loadingMore,  setLoadingMore]  = useState(false)
 
-  // Reset pagination each time the drawer opens
+  // Reset to first page every time the drawer is opened
   useEffect(() => {
     if (open) setVisibleCount(PAGE_SIZE)
   }, [open])
 
   function handleLoadMore() {
     setLoadingMore(true)
-    // Simulated delay — replace with API call when backend is connected
+    // Simulated delay — mimics a real paginated API call.
+    // Replace with api.get('/transactions?page=N') if the backend adds pagination.
     setTimeout(() => {
       setVisibleCount(c => c + PAGE_SIZE)
       setLoadingMore(false)
     }, 600)
   }
 
-  const visible = transactions.slice(0, visibleCount)
+  const visible   = transactions.slice(0, visibleCount)
   const remaining = transactions.length - visibleCount
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Backdrop — clicking it closes the drawer */}
       <div
         onClick={onClose}
         className={`fixed inset-0 bg-black/40 z-40 transition-opacity duration-300 ${
@@ -47,7 +67,7 @@ export default function TransactionDrawer({ open, onClose, transactions }: Props
         }`}
       />
 
-      {/* Slide-in panel */}
+      {/* Slide-in panel — translate-x-full moves it off screen; translate-x-0 brings it in */}
       <div
         className={`fixed top-0 right-0 h-full w-full max-w-md bg-citi-card border-l border-citi-border z-50 flex flex-col shadow-2xl transition-transform duration-300 ease-in-out ${
           open ? 'translate-x-0' : 'translate-x-full'
@@ -85,8 +105,10 @@ export default function TransactionDrawer({ open, onClose, transactions }: Props
                       <p className="text-citi-text text-sm font-medium">{txn.description}</p>
                       <p className="text-citi-muted text-xs mt-0.5">{txn.date}</p>
                     </div>
+                    {/* + for incoming money, − for outgoing */}
                     <span className={`font-semibold text-sm shrink-0 ml-4 ${typeStyles[txn.type]}`}>
-                      {txn.type === 'deposit' ? '+' : '−'} ${txn.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {(txn.type === 'DEPOSIT' || txn.type === 'TRANSFER_IN') ? '+' : '−'}
+                      {' '}${txn.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </li>
                 ))}

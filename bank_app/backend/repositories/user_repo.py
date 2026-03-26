@@ -32,10 +32,10 @@ class UserRepo:
         user.deleted_at = datetime.now(timezone.utc)
         return user
 
-    def add_user(self, session, name, email):
+    def add_user(self, session, name, email, password_hash=None):
         # Insert a new user row and return the User object with the generated user_id.
         # session.flush() assigns the ID without committing.
-        user = User(name=name, email=email)
+        user = User(name=name, email=email, password_hash=password_hash)
         session.add(user)
         session.flush()
         return user

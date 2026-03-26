@@ -109,6 +109,29 @@ Every deposit, withdrawal, and transfer leg is recorded in the `transactions` ta
 - Sender gets: `TRANSFER_OUT — "Transfer to account #42"`
 - Recipient gets: `TRANSFER_IN — "Transfer from account #7"`
 
+### Password Hashing
+
+Passwords are never stored in plain text. On registration, the password is run through a one-way hashing function (Werkzeug's `generate_password_hash`) before being saved to the database. The result looks like:
+
+```
+scrypt:32768:8:1$abc123$a8f3c2d1e4...
+```
+
+On login, the submitted password is hashed and compared against the stored hash using `check_password_hash`. Since hashing is a one-way operation, the original password cannot be recovered from the hash — even if someone gained direct access to the database.
+
+```python
+from werkzeug.security import generate_password_hash, check_password_hash
+
+# Register
+password_hash = generate_password_hash("mypassword123")
+
+# Login
+check_password_hash(password_hash, "mypassword123")  # True
+check_password_hash(password_hash, "wrongpassword")  # False
+```
+
+`password_hash` is nullable to allow existing users created via Postman (without a password) to coexist with new users registered through the frontend.
+
 ### User-Account Relationship
 
 A user can own multiple accounts. When `POST /accounts` is called, the service checks whether a user with that email already exists before creating a new one — preventing duplicate user rows for the same person.
@@ -136,6 +159,32 @@ SQLAlchemy's `create_all()` creates tables that don't exist yet but **will not a
 ALTER TABLE users ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE users ADD COLUMN deleted_at TIMESTAMP NULL;
 
+-- Add auth columns to users
+ALTER TABLE users ADD COLUMN password_hash VARCHAR(255) NULL;
+ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT FALSE;
+
 -- Add description column to transactions
 ALTER TABLE transactions ADD COLUMN description VARCHAR(100) NULL;
+
+-- Enforce account type as an enum (prevents invalid values at the database level)
+ALTER TABLE accounts MODIFY COLUMN account_type ENUM('CHECKING', 'SAVINGS') NOT NULL;
 ```
+
+### Backfilling passwords for existing users
+
+Users created via Postman before the password system existed will have `password_hash = NULL` and cannot log in. To fix this, generate a hash manually and update the row directly in MySQL — this is equivalent to what the app does automatically on registration.
+
+**Step 1 — generate the hash** (activate the venv first):
+
+```bash
+.venv\Scripts\activate
+python -c "from werkzeug.security import generate_password_hash; print(generate_password_hash('yourpassword'))"
+```
+
+**Step 2 — paste the full output into MySQL** (copy the entire `scrypt:...` string including the prefix):
+
+```sql
+UPDATE users SET password_hash = '<paste full hash here>' WHERE email = 'user@example.com';
+```
+
+Any user created going forward through `POST /accounts` with a `password` field will have a hash stored automatically.
