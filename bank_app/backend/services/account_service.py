@@ -106,6 +106,55 @@ def withdraw(account_id, amount):
     finally:
         session.close()
 
+def transfer(sender_account_id, recipient_account_id, amount):
+    """
+    Transfer a positive amount from one account to another.
+    Both accounts must exist and the sender must have sufficient funds.
+    Records a TRANSFER_OUT on the sender and a TRANSFER_IN on the recipient.
+    Both balance updates and both transaction records are committed atomically —
+    if anything fails, the whole operation rolls back.
+    Returns updated sender balance.
+    Raises ValueError for invalid input, missing accounts, or insufficient funds.
+    """
+    if amount <= 0:
+        raise ValueError("Transfer amount must be positive")
+    if sender_account_id == recipient_account_id:
+        raise ValueError("Cannot transfer to the same account")
+    session = get_db()
+    try:
+        sender = account_repo.get_account_by_id(session, sender_account_id)
+        if not sender:
+            raise ValueError("Sender account not found")
+        recipient = account_repo.get_account_by_id(session, recipient_account_id)
+        if not recipient:
+            raise ValueError("Recipient account not found")
+        if float(sender.balance) < amount:
+            raise ValueError("Insufficient funds")
+
+        new_sender_balance    = float(sender.balance) - amount
+        new_recipient_balance = float(recipient.balance) + amount
+
+        account_repo.update_balance(session, sender_account_id, new_sender_balance)
+        account_repo.update_balance(session, recipient_account_id, new_recipient_balance)
+
+        transaction_repo.add_transaction(
+            session, sender_account_id, 'TRANSFER_OUT', amount,
+            description=f"Transfer to account #{recipient_account_id}"
+        )
+        transaction_repo.add_transaction(
+            session, recipient_account_id, 'TRANSFER_IN', amount,
+            description=f"Transfer from account #{sender_account_id}"
+        )
+
+        session.commit()
+        return {"accountId": sender_account_id, "balance": new_sender_balance}
+    except:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
 def get_transactions(account_id):
     """
     Retrieve a list of transactions for the specified account ID.
@@ -119,6 +168,7 @@ def get_transactions(account_id):
                 "txnId": t.txn_id,
                 "type": t.txn_type,
                 "amount": float(t.amount),
+                "description": t.description,
                 "date": str(t.created_at)[:10]
             }
             for t in transactions

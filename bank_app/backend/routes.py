@@ -54,6 +54,17 @@ def make_withdrawal(account_id):
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
 
+@bp.route('/accounts/<int:account_id>/transfer', methods=['POST'])
+def make_transfer(account_id):
+    # Transfer money to another account. Expects JSON body: { recipientAccountId, amount }
+    # Returns the sender's updated balance.
+    data = request.get_json()
+    try:
+        result = account_service.transfer(account_id, data['recipientAccountId'], data['amount'])
+        return jsonify(result)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
 @bp.route('/accounts/<int:account_id>/transactions', methods=['GET'])
 def transactions(account_id):
     # Return the full transaction history for an account as a JSON array.

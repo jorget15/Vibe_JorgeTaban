@@ -5,11 +5,13 @@
 from models.transaction import Transaction
 
 class TransactionRepo:
-    def add_transaction(self, session, account_id, txn_type, amount):
-        # Insert a new transaction record ('DEPOSIT' or 'WITHDRAW').
+    def add_transaction(self, session, account_id, txn_type, amount, description=None):
+        # Insert a new transaction record.
+        # txn_type: 'DEPOSIT', 'WITHDRAW', 'TRANSFER_OUT', or 'TRANSFER_IN'
+        # description: optional human-readable note (e.g. "To account #5")
         # Always called together with AccountRepo.update_balance() so the balance
         # change and the transaction log are saved in the same commit.
-        txn = Transaction(account_id=account_id, txn_type=txn_type, amount=amount)
+        txn = Transaction(account_id=account_id, txn_type=txn_type, amount=amount, description=description)
         session.add(txn)
         session.flush()
         return txn
