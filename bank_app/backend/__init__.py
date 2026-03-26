@@ -7,8 +7,10 @@ from flask_cors import CORS
 def create_app():
     app = Flask(__name__)
 
-    # Allow requests from the React frontend (running on a different port).
-    CORS(app)
+    # Allow requests from any origin, including the Vercel frontend.
+    # supports_credentials=False + wildcard origins is the standard setup
+    # for a public API. The explicit OPTIONS handling fixes preflight failures.
+    CORS(app, origins="*", supports_credentials=False)
 
     # MongoDB connects automatically when db/database.py is imported —
     # no init_db() call needed (that was a SQLAlchemy concept).
