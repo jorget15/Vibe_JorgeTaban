@@ -1,41 +1,93 @@
-# Data access for the users table using SQLAlchemy ORM.
-# Repositories are the only layer that talks to the DB — no SQL lives anywhere else.
-# All methods receive a session from the service layer so multiple repo calls
-# can share one transaction and be committed or rolled back together.
+# Data access for the users collection — MongoDB via PyMongo.
+#
+# KEY DIFFERENCES from the old SQLAlchemy version:
+#   - No `session` parameter. MongoDB repos get their db handle in __init__,
+#     not passed in per call. There is no shared transaction object to pass around.
+#   - No model class (User). Documents are plain Python dicts.
+#   - No session.add() / session.flush() / session.commit(). Writes go to
+#     MongoDB immediately when you call insert_one() or update_one().
+#   - Reads return dicts: {"user_id": 1, "name": "Jorge", ...}
+#     The service layer accesses fields with dict notation: user["name"].
 from datetime import datetime, timezone
-from models.user import User
+from pymongo import ReturnDocument
+from db.database import get_mongo_db
+
+
+def _next_id(db, collection_name):
+    ''' Generate the next auto-increment integer ID for a collection.
+
+    MongoDB does not auto-generate integer primary keys — it uses ObjectId by
+    default. Since our routes and frontend use integer IDs everywhere, we
+    maintain a `counters` collection that tracks the last-used integer per
+    collection name.
+
+    find_one_and_update does this atomically in one round-trip:
+      - $inc increments the `seq` field by 1.
+      - upsert=True creates the counter document if it doesn't exist yet.
+      - ReturnDocument.AFTER returns the document AFTER the increment,
+        so we always get the new value (not the old one).
+
+    Example counters collection:
+      { "_id": "users",        "seq": 3 }
+      { "_id": "accounts",     "seq": 5 }
+      { "_id": "transactions", "seq": 12 }
+    '''
+    result = db.counters.find_one_and_update(
+        {"_id": collection_name},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        return_document=ReturnDocument.AFTER
+    )
+    return result["seq"]
+
 
 class UserRepo:
-    def get_user_by_email(self, session, email):
-        # Look up a user by email. Used to avoid creating duplicate users.
-        # Returns a User object, or None if not found.
-        return session.query(User).filter_by(email=email).first()
+    def __init__(self):
+        # Get the database handle once at startup.
+        # mongo_db is a module-level singleton — this is safe and cheap.
+        self._db = get_mongo_db()
 
-    def get_user_by_id(self, session, user_id):
-        # Look up a user by their primary key.
-        # Returns a User object, or None if not found.
-        return session.query(User).filter_by(user_id=user_id).first()
+    def get_user_by_email(self, email):
+        # find_one returns a dict matching the filter, or None if not found.
+        # {"email": email} is the MongoDB equivalent of WHERE email = ?
+        return self._db.users.find_one({"email": email})
 
-    def get_all_users(self, session):
-        # Return all user rows including soft-deleted ones.
-        # Admin-only — callers decide what to expose.
-        return session.query(User).all()
+    def get_user_by_id(self, user_id):
+        return self._db.users.find_one({"user_id": user_id})
 
-    def soft_delete(self, session, user_id):
-        # Mark a user as deleted without removing the row.
-        # Real name/email stay in the DB for audit purposes.
-        # Returns the User object, or None if not found.
-        user = session.query(User).filter_by(user_id=user_id).first()
-        if not user:
-            return None
-        user.is_deleted = True
-        user.deleted_at = datetime.now(timezone.utc)
-        return user
+    def get_all_users(self):
+        # find() with no filter returns all documents as a cursor.
+        # list() materializes the cursor into a Python list of dicts.
+        return list(self._db.users.find())
 
-    def add_user(self, session, name, email, password_hash=None):
-        # Insert a new user row and return the User object with the generated user_id.
-        # session.flush() assigns the ID without committing.
-        user = User(name=name, email=email, password_hash=password_hash)
-        session.add(user)
-        session.flush()
-        return user
+    def soft_delete(self, user_id):
+        # update_one finds the first matching document and applies the update.
+        # $set only touches the specified fields — all other fields are unchanged.
+        # This is the MongoDB equivalent of:
+        #   UPDATE users SET is_deleted=TRUE, deleted_at=NOW() WHERE user_id=?
+        now = datetime.now(timezone.utc)
+        result = self._db.users.find_one_and_update(
+            {"user_id": user_id},
+            {"$set": {"is_deleted": True, "deleted_at": now}},
+            return_document=ReturnDocument.AFTER  # return the updated document
+        )
+        # result is None if no document matched — service layer checks for this.
+        return result
+
+    def add_user(self, name, email, password_hash=None):
+        user_id = _next_id(self._db, "users")
+        doc = {
+            "user_id":       user_id,
+            "name":          name,
+            "email":         email,
+            "password_hash": password_hash,
+            "is_admin":      False,
+            "is_deleted":    False,
+            "deleted_at":    None,
+            "created_at":    datetime.now(timezone.utc),
+        }
+        # insert_one writes the document immediately — no commit needed.
+        # MongoDB also adds an `_id` (ObjectId) field automatically, but we
+        # don't use it — our app identifies users by the integer user_id.
+        self._db.users.insert_one(doc)
+        return doc

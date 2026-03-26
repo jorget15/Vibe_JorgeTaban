@@ -3,7 +3,6 @@
 # makes the app easier to test and configure for different environments.
 from flask import Flask
 from flask_cors import CORS
-from db.database import init_db
 
 def create_app():
     app = Flask(__name__)
@@ -11,8 +10,8 @@ def create_app():
     # Allow requests from the React frontend (running on a different port).
     CORS(app)
 
-    # Create the SQLite database file and tables if they don't exist yet.
-    init_db()
+    # MongoDB connects automatically when db/database.py is imported —
+    # no init_db() call needed (that was a SQLAlchemy concept).
 
     # Register all API routes under the /api prefix (e.g. /api/accounts).
     from routes import bp

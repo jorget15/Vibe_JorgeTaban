@@ -1,6 +1,6 @@
 # Bank App — Backend
 
-A Flask REST API backed by a MySQL database, using SQLAlchemy ORM. The backend follows a strict three-layer architecture: routes handle HTTP, services enforce business rules, and repositories own all database access.
+A Flask REST API backed by MongoDB Atlas, using PyMongo. The backend follows a strict three-layer architecture: routes handle HTTP, services enforce business rules, and repositories own all database access.
 
 ---
 
@@ -9,9 +9,10 @@ A Flask REST API backed by a MySQL database, using SQLAlchemy ORM. The backend f
 | Library | Role |
 |---------|------|
 | **Flask** | HTTP framework and route registration |
-| **SQLAlchemy** | ORM — all DB reads and writes go through models, never raw SQL |
-| **MySQL** | Primary database |
-| **PyMySQL** | MySQL driver for SQLAlchemy |
+| **PyMongo** | MongoDB driver — all DB reads and writes go through repositories |
+| **MongoDB Atlas** | Primary database (cloud-hosted) |
+| **python-dotenv** | Loads credentials from `.env` so they stay out of version control |
+| **Werkzeug** | Password hashing (`generate_password_hash` / `check_password_hash`) |
 
 ---
 
@@ -19,21 +20,37 @@ A Flask REST API backed by a MySQL database, using SQLAlchemy ORM. The backend f
 
 ```
 backend/
-├── app.py                  # Entry point — creates Flask app, registers blueprint
+├── run.py                  # Entry point — creates Flask app, registers blueprint
 ├── routes.py               # HTTP layer — maps endpoints to service calls
+├── .env                    # Local credentials — never committed (see .gitignore)
+├── .env.example            # Template — copy to .env and fill in your values
 ├── db/
-│   └── database.py         # SQLAlchemy engine, Base, and get_db() session factory
-├── models/
-│   ├── user.py             # ORM model for the users table
-│   ├── account.py          # ORM model for the accounts table
-│   └── transaction.py      # ORM model for the transactions table
+│   └── database.py         # MongoClient setup and get_mongo_db() factory
 ├── repositories/
-│   ├── user_repo.py        # All DB access for users
-│   ├── account_repo.py     # All DB access for accounts
-│   └── transaction_repo.py # All DB access for transactions
+│   ├── user_repo.py        # All DB access for the users collection
+│   ├── account_repo.py     # All DB access for the accounts collection
+│   └── transaction_repo.py # All DB access for the transactions collection
 └── services/
-    └── account_service.py  # Business logic and transaction coordination
+    └── account_service.py  # Business logic and atomic operation coordination
 ```
+
+---
+
+## Environment Variables
+
+Credentials are stored in a `.env` file that is **never committed to git**.
+
+**Step 1** — copy the example file:
+```bash
+cp .env.example .env
+```
+
+**Step 2** — open `.env` and fill in your Atlas connection string:
+```
+MONGO_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/<dbname>
+```
+
+The app will raise a clear error on startup if `MONGO_URI` is missing, so you know immediately if the setup is incomplete.
 
 ---
 
@@ -43,28 +60,26 @@ backend/
 
 **Routes (`routes.py`)** — HTTP only. Reads request data, calls the service, returns JSON with the correct status code. Contains no business logic and no database access.
 
-**Services (`account_service.py`)** — Business rules. Validates inputs, checks account existence, enforces constraints (e.g. positive amounts, sufficient funds). Opens a session, coordinates across multiple repos, and either commits or rolls back as a unit.
+**Services (`account_service.py`)** — Business rules. Validates inputs, checks account existence, enforces constraints (e.g. positive amounts, sufficient funds). Coordinates across multiple repositories and manages atomicity for multi-step operations.
 
-**Repositories (`*_repo.py`)** — Database only. Each method receives a session from the service layer so multiple repo calls can share one transaction. No SQL exists anywhere outside these files.
+**Repositories (`*_repo.py`)** — Database only. Each repository gets the MongoDB database handle in its `__init__` and exposes clean methods for the service layer to call. No query logic exists anywhere outside these files.
 
-### Session Pattern
+### Atomicity with MongoDB Transactions
 
-Every service function follows the same pattern:
+For operations that require multiple writes to succeed or fail together (like a money transfer), we use MongoDB multi-document transactions via `mongo_client.start_session()`:
 
 ```python
-session = get_db()
-try:
-    # ... repo calls ...
-    session.commit()
-    return result
-except:
-    session.rollback()
-    raise
-finally:
-    session.close()
+with mongo_client.start_session() as session:
+    with session.start_transaction():
+        # all writes here are atomic
+        # if anything raises, the entire transaction is rolled back
 ```
 
-This guarantees atomicity: if anything fails mid-operation, the entire change is rolled back and nothing is partially written.
+This requires a MongoDB **replica set** or **Atlas** cluster (standalone instances do not support multi-document transactions).
+
+### Integer IDs
+
+MongoDB generates a random `ObjectId` as `_id` by default. This app keeps integer IDs (`user_id`, `account_id`) to avoid changing the frontend, routes, and API contract. A `counters` collection tracks the last-used integer per collection and is incremented atomically using `find_one_and_update` with `$inc`.
 
 ---
 
@@ -73,7 +88,9 @@ This guarantees atomicity: if anything fails mid-operation, the entire change is
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/health` | Server liveness check |
+| `POST` | `/api/login` | Authenticate a user |
 | `POST` | `/api/accounts` | Create a new account (and user if needed) |
+| `GET` | `/api/accounts/lookup` | Look up a recipient by account number or email |
 | `GET` | `/api/accounts/<id>` | Get account details and balance |
 | `POST` | `/api/accounts/<id>/deposit` | Deposit money |
 | `POST` | `/api/accounts/<id>/withdraw` | Withdraw money |
@@ -88,53 +105,26 @@ This guarantees atomicity: if anything fails mid-operation, the entire change is
 
 ### Soft Delete
 
-Accounts and users are never physically removed from the database. When a deletion is requested, only an `is_deleted` flag is flipped on the `users` table and a `deleted_at` timestamp is recorded. All rows — user, account, and every transaction — remain intact.
+Accounts and users are never physically removed. When a deletion is requested, an `is_deleted` flag is set and a `deleted_at` timestamp is recorded on the user document. All documents — user, account, and every transaction — remain intact.
 
-**Why:** Financial records must be preserved for auditing. Deleting transaction rows would create gaps in the ledger that are impossible to explain or reconcile after the fact.
+**Why:** Financial records must be preserved for auditing. Removing documents would create gaps in the ledger.
 
-**Role-based data masking:** Regular endpoints (e.g. `GET /accounts/<id>`) check `is_deleted` and return masked values (`"Deleted User"`, `"deleted@deleted.com"`) to protect the deleted user's PII. The admin endpoint (`GET /users`) always returns the real name and email so administrators can identify who the account belonged to.
-
-**No cascading needed:** Because no rows are ever removed, foreign key relationships remain valid indefinitely. There is no need to configure cascade rules or manually delete child records before a parent.
+**Role-based data masking:** Regular endpoints return masked values (`"Deleted User"`, `"deleted@deleted.com"`) for deleted accounts. The admin endpoint always returns the real name and email.
 
 ### Money Transfers (Atomic)
 
-A transfer involves four writes: two balance updates and two transaction records (one `TRANSFER_OUT` on the sender, one `TRANSFER_IN` on the recipient). All four happen inside a single SQLAlchemy session.
-
-If any step fails — for example the recipient account doesn't exist or the database rejects a write — the entire session is rolled back. Money cannot disappear halfway through a transfer.
+A transfer involves four writes: two balance updates and two transaction records. All four happen inside a single MongoDB transaction. If any step fails, the entire transaction is rolled back — money cannot disappear halfway through.
 
 ### Transaction History
 
-Every deposit, withdrawal, and transfer leg is recorded in the `transactions` table with a type (`DEPOSIT`, `WITHDRAW`, `TRANSFER_OUT`, `TRANSFER_IN`), amount, and an optional human-readable description. Transfer records cross-reference each other:
+Every deposit, withdrawal, and transfer leg is recorded in the `transactions` collection with a type (`DEPOSIT`, `WITHDRAW`, `TRANSFER_OUT`, `TRANSFER_IN`), amount, and a human-readable description:
 
-- Sender gets: `TRANSFER_OUT — "Transfer to account #42"`
-- Recipient gets: `TRANSFER_IN — "Transfer from account #7"`
+- Sender sees: `TRANSFER_OUT — "Transfer to Jane Doe (account #3)"`
+- Recipient sees: `TRANSFER_IN — "Transfer from John Smith (account #7)"`
 
 ### Password Hashing
 
-Passwords are never stored in plain text. On registration, the password is run through a one-way hashing function (Werkzeug's `generate_password_hash`) before being saved to the database. The result looks like:
-
-```
-scrypt:32768:8:1$abc123$a8f3c2d1e4...
-```
-
-On login, the submitted password is hashed and compared against the stored hash using `check_password_hash`. Since hashing is a one-way operation, the original password cannot be recovered from the hash — even if someone gained direct access to the database.
-
-```python
-from werkzeug.security import generate_password_hash, check_password_hash
-
-# Register
-password_hash = generate_password_hash("mypassword123")
-
-# Login
-check_password_hash(password_hash, "mypassword123")  # True
-check_password_hash(password_hash, "wrongpassword")  # False
-```
-
-`password_hash` is nullable to allow existing users created via Postman (without a password) to coexist with new users registered through the frontend.
-
-### User-Account Relationship
-
-A user can own multiple accounts. When `POST /accounts` is called, the service checks whether a user with that email already exists before creating a new one — preventing duplicate user rows for the same person.
+Passwords are never stored in plain text. On registration, the password is run through Werkzeug's `generate_password_hash` before being saved. On login, `check_password_hash` compares the submitted password against the stored hash. The original password cannot be recovered from the hash.
 
 ---
 
@@ -142,49 +132,9 @@ A user can own multiple accounts. When `POST /accounts` is called, the service c
 
 ```bash
 cd bank_app/backend
-pip install -r requirements.txt
-python app.py      # starts at http://127.0.0.1:5000
+cp .env.example .env        # then fill in MONGO_URI
+uv sync                     # install dependencies
+python run.py               # starts at http://127.0.0.1:5000
 ```
 
 Visit `http://127.0.0.1:5000/api/health` to confirm the server is up.
-
----
-
-## Database Setup
-
-SQLAlchemy's `create_all()` creates tables that don't exist yet but **will not alter existing tables**. If you add a column to a model after the table already exists in MySQL, run the `ALTER TABLE` statement manually:
-
-```sql
--- Add soft-delete columns to users
-ALTER TABLE users ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE users ADD COLUMN deleted_at TIMESTAMP NULL;
-
--- Add auth columns to users
-ALTER TABLE users ADD COLUMN password_hash VARCHAR(255) NULL;
-ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT FALSE;
-
--- Add description column to transactions
-ALTER TABLE transactions ADD COLUMN description VARCHAR(100) NULL;
-
--- Enforce account type as an enum (prevents invalid values at the database level)
-ALTER TABLE accounts MODIFY COLUMN account_type ENUM('CHECKING', 'SAVINGS') NOT NULL;
-```
-
-### Backfilling passwords for existing users
-
-Users created via Postman before the password system existed will have `password_hash = NULL` and cannot log in. To fix this, generate a hash manually and update the row directly in MySQL — this is equivalent to what the app does automatically on registration.
-
-**Step 1 — generate the hash** (activate the venv first):
-
-```bash
-.venv\Scripts\activate
-python -c "from werkzeug.security import generate_password_hash; print(generate_password_hash('yourpassword'))"
-```
-
-**Step 2 — paste the full output into MySQL** (copy the entire `scrypt:...` string including the prefix):
-
-```sql
-UPDATE users SET password_hash = '<paste full hash here>' WHERE email = 'user@example.com';
-```
-
-Any user created going forward through `POST /accounts` with a `password` field will have a hash stored automatically.
