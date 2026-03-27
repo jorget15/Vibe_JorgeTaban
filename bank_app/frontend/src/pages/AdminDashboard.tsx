@@ -14,7 +14,7 @@ interface AdminUser {
   isDeleted: boolean
   createdAt: string
   txnCount:  number
-  accounts:  { accountId: number; accountType: string; balance: number }[]
+  accounts:  { accountId: number; accountType: string; balance: number; txnCount: number; createdAt: string }[]
 }
 
 const fmt = (n: number) =>
@@ -25,8 +25,17 @@ export default function AdminDashboard() {
   const navigate = useNavigate()
   const { username } = useSelector((state: RootState) => state.auth)
 
-  const [users,   setUsers]   = useState<AdminUser[]>([])
-  const [loading, setLoading] = useState(true)
+  const [users,    setUsers]    = useState<AdminUser[]>([])
+  const [loading,  setLoading]  = useState(true)
+  const [openRows, setOpenRows] = useState<Set<number>>(new Set())
+
+  function toggleRow(userId: number) {
+    setOpenRows(prev => {
+      const next = new Set(prev)
+      next.has(userId) ? next.delete(userId) : next.add(userId)
+      return next
+    })
+  }
 
   useEffect(() => {
     api.get('/users')
@@ -113,6 +122,7 @@ export default function AdminDashboard() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-admin-border">
+                    <th className="w-10" />
                     {['ID', 'Name', 'Email', 'Balance', 'Role', 'Txns', 'Since'].map((h, i) => (
                       <th
                         key={h}
@@ -127,34 +137,78 @@ export default function AdminDashboard() {
                 </thead>
                 <tbody className="divide-y divide-admin-border">
                   {users.map((user) => {
-                    const balance = user.accounts.reduce((s, a) => s + a.balance, 0)
+                    const balance  = user.accounts.reduce((s, a) => s + a.balance, 0)
+                    const isOpen   = openRows.has(user.userId)
                     return (
-                      <tr
-                        key={user.userId}
-                        className={`transition-colors duration-150 ${
-                          user.isDeleted ? 'opacity-40' : 'hover:bg-admin-surface'
-                        }`}
-                      >
-                        <td className="px-6 py-4 text-admin-muted text-xs tabular-nums">
-                          {String(user.userId).padStart(6, '0')}
-                        </td>
-                        <td className="px-6 py-4 font-medium text-admin-text">{user.name}</td>
-                        <td className="px-6 py-4 text-admin-muted">{user.email}</td>
-                        <td className="px-6 py-4 text-right text-admin-accent tabular-nums font-medium">
-                          ${fmt(balance)}
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold tracking-wider uppercase ${
-                            user.isAdmin
-                              ? 'bg-admin-amber/10 text-admin-amber border border-admin-amber/30'
-                              : 'bg-admin-accent/10 text-admin-accent border border-admin-accent/30'
-                          }`}>
-                            {user.isAdmin ? 'admin' : 'user'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right text-admin-muted tabular-nums">{user.txnCount}</td>
-                        <td className="px-6 py-4 text-right text-admin-muted">{user.createdAt}</td>
-                      </tr>
+                      <>
+                        {/* ── Main user row ── */}
+                        <tr
+                          key={user.userId}
+                          className={`transition-colors duration-150 ${
+                            user.isDeleted ? 'opacity-40' : 'hover:bg-admin-surface'
+                          }`}
+                        >
+                          <td className="pl-4">
+                            <button
+                              onClick={() => toggleRow(user.userId)}
+                              aria-label={isOpen ? 'Collapse' : 'Expand'}
+                              disabled={user.accounts.length === 0}
+                              className="text-admin-muted hover:text-admin-text transition-colors disabled:opacity-30"
+                            >
+                              {/* Chevron — rotates when open */}
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+                                fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+                          </td>
+                          <td className="px-6 py-4 text-admin-muted text-xs tabular-nums">
+                            {String(user.userId).padStart(6, '0')}
+                          </td>
+                          <td className="px-6 py-4 font-medium text-admin-text">{user.name}</td>
+                          <td className="px-6 py-4 text-admin-muted">{user.email}</td>
+                          <td className="px-6 py-4 text-right text-admin-accent tabular-nums font-medium">
+                            ${fmt(balance)}
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold tracking-wider uppercase ${
+                              user.isAdmin
+                                ? 'bg-admin-amber/10 text-admin-amber border border-admin-amber/30'
+                                : 'bg-admin-accent/10 text-admin-accent border border-admin-accent/30'
+                            }`}>
+                              {user.isAdmin ? 'admin' : 'user'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-right text-admin-muted tabular-nums">{user.txnCount}</td>
+                          <td className="px-6 py-4 text-right text-admin-muted">{user.createdAt}</td>
+                        </tr>
+
+                        {/* ── Collapsible account rows — one per account, aligned to parent columns ── */}
+                        {isOpen && user.accounts.map((acct) => (
+                          <tr key={`${user.userId}-${acct.accountId}`} className="bg-admin-surface/50">
+                            <td />
+                            <td className="px-6 py-2 text-admin-muted text-xs tabular-nums">
+                              #{String(acct.accountId).padStart(6, '0')}
+                            </td>
+                            <td className="px-6 py-2 text-admin-muted text-xs" colSpan={2}>
+                              {acct.accountType.charAt(0) + acct.accountType.slice(1).toLowerCase()}
+                            </td>
+                            <td className="px-6 py-2 text-right text-admin-accent text-xs tabular-nums font-medium">
+                              ${fmt(acct.balance)}
+                            </td>
+                            <td />
+                            <td className="px-6 py-2 text-right text-admin-muted text-xs tabular-nums">
+                              {acct.txnCount}
+                            </td>
+                            <td className="px-6 py-2 text-right text-admin-muted text-xs">
+                              {acct.createdAt}
+                            </td>
+                          </tr>
+                        ))}
+                      </>
                     )
                   })}
                 </tbody>

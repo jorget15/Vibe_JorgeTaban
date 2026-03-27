@@ -302,7 +302,9 @@ def get_all_users():
                 {
                     "accountId":   a["account_id"],
                     "accountType": a["account_type"],
-                    "balance":     float(a["balance"])
+                    "balance":     float(a["balance"]),
+                    "txnCount":    transaction_repo.count_by_account_ids([a["account_id"]]),
+                    "createdAt":   str(a["created_at"])[:10]
                 }
                 for a in accounts
             ]
@@ -359,7 +361,7 @@ def get_transactions(account_id):
             "type":        t["txn_type"],
             "amount":      float(t["amount"]),
             "description": t["description"],
-            "date":        str(t["created_at"])[:10]
+            "date":        t["created_at"].strftime("%Y-%m-%dT%H:%M:%SZ") if hasattr(t["created_at"], "strftime") else str(t["created_at"])
         }
         for t in transactions
     ]

@@ -106,6 +106,14 @@ export default function Dashboard() {
     setTransferAmt('')
   }
 
+  function formatDate(raw: string) {
+    const d = new Date(raw)
+    return d.toLocaleString('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric',
+      hour: 'numeric', minute: '2-digit', hour12: true,
+    })
+  }
+
   const typeStyles: Record<string, string> = {
     DEPOSIT:      'text-green-600',
     WITHDRAW:     'text-citi-red',
@@ -301,7 +309,7 @@ export default function Dashboard() {
                   {txn.description && (
                     <p className="text-citi-text text-sm mt-0.5">{txn.description}</p>
                   )}
-                  <p className="text-citi-muted text-xs mt-0.5">{txn.date}</p>
+                  <p className="text-citi-muted text-xs mt-0.5">{formatDate(txn.date)}</p>
                 </div>
                 <span className={`font-semibold text-sm shrink-0 ml-4 ${typeStyles[txn.type]}`}>
                   {(txn.type === 'DEPOSIT' || txn.type === 'TRANSFER_IN') ? '+' : '−'} ${txn.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
