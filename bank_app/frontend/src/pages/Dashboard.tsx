@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import type { RootState, AppDispatch } from '../store'
 import { depositAsync, withdrawAsync, transferAsync, clearError, fetchAccountAsync, fetchTransactionsAsync } from '../store/accountSlice'
@@ -9,6 +10,7 @@ import api from '../api'
 
 export default function Dashboard() {
   const dispatch  = useDispatch<AppDispatch>()
+  const navigate  = useNavigate()
   const { username, accountId } = useSelector((state: RootState) => state.auth)
   const { balance, accountType, transactions, loading, error } = useSelector((state: RootState) => state.account)
 
@@ -111,8 +113,26 @@ export default function Dashboard() {
     TRANSFER_IN:  'text-green-600',
   }
 
+  const typeLabels: Record<string, string> = {
+    DEPOSIT:      'Deposit',
+    WITHDRAW:     'Withdrawal',
+    TRANSFER_OUT: 'Sent',
+    TRANSFER_IN:  'Received',
+  }
+
   return (
     <main className="max-w-5xl mx-auto px-6 py-12 space-y-8">
+
+      {/* Back link */}
+      <button
+        onClick={() => navigate('/accounts')}
+        className="flex items-center gap-1.5 text-citi-muted text-sm hover:text-citi-text transition-colors"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+        All accounts
+      </button>
 
       {/* Balance card — blue top border makes it stand out as the primary card */}
       <div className="bg-citi-card border-t-4 border-citi-action rounded-xl p-8 shadow-sm">
@@ -123,6 +143,7 @@ export default function Dashboard() {
           ${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </p>
         <p className="text-citi-muted text-sm mt-2">Available balance · {accountType ?? 'Checking'}</p>
+        <p className="text-citi-muted text-xs mt-1">Account #{accountId}</p>
       </div>
 
       {/* Action panels */}
@@ -274,10 +295,15 @@ export default function Dashboard() {
             {transactions.slice(0, 10).map((txn) => (
               <li key={txn.id} className="px-6 py-4 flex justify-between items-center transition-colors duration-150 hover:bg-citi-surface">
                 <div>
-                  <p className="text-citi-text text-sm font-medium">{txn.description}</p>
+                  <span className={`text-xs font-semibold uppercase tracking-wide ${typeStyles[txn.type]}`}>
+                    {typeLabels[txn.type]}
+                  </span>
+                  {txn.description && (
+                    <p className="text-citi-text text-sm mt-0.5">{txn.description}</p>
+                  )}
                   <p className="text-citi-muted text-xs mt-0.5">{txn.date}</p>
                 </div>
-                <span className={`font-semibold text-sm ${typeStyles[txn.type]}`}>
+                <span className={`font-semibold text-sm shrink-0 ml-4 ${typeStyles[txn.type]}`}>
                   {(txn.type === 'DEPOSIT' || txn.type === 'TRANSFER_IN') ? '+' : '−'} ${txn.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </li>

@@ -221,6 +221,35 @@ def all_users():
     return jsonify(result)
 
 
+@bp.route('/users/<int:user_id>/accounts', methods=['GET'])
+def user_accounts(user_id):
+    ''' Return all accounts belonging to a user.
+
+    Used by the accounts overview screen so the user can see and switch
+    between their checking and savings accounts.
+    '''
+    try:
+        result = account_service.get_user_accounts(user_id)
+        return jsonify(result)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
+
+
+@bp.route('/users/<int:user_id>/accounts', methods=['POST'])
+def add_user_account(user_id):
+    ''' Open a new account for an existing user.
+
+    Expects JSON body: { accountType }
+    Returns: { accountId, accountType, balance } on success (HTTP 201 Created)
+    '''
+    data = request.get_json()
+    try:
+        result = account_service.add_account_to_user(user_id, data['accountType'])
+        return jsonify(result), 201
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+
 @bp.route('/accounts/<int:account_id>/transactions', methods=['GET'])
 def transactions(account_id):
     ''' Return the full transaction history for an account.

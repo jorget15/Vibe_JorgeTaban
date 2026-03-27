@@ -52,6 +52,13 @@ MONGO_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/<dbname>
 
 The app will raise a clear error on startup if `MONGO_URI` is missing, so you know immediately if the setup is incomplete.
 
+### MongoDB Atlas Network Access
+
+When deploying to a cloud host (e.g. Render), you must whitelist the host's IP in **MongoDB Atlas → Network Access**.
+
+- **Development / demo**: Allow Access from Anywhere (`0.0.0.0/0`) — acceptable for course projects with no real user data.
+- **Production**: Add only your host's static outbound IP. Render requires a paid plan for a static IP; other providers (Railway, Fly.io) vary. Using `0.0.0.0/0` in production leaves the cluster exposed to brute-force attempts — the only protection is your Atlas password.
+
 ---
 
 ## Architecture

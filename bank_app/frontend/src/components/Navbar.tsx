@@ -44,7 +44,7 @@ export default function Navbar() {
           <Link to="/about" className="text-citi-muted hover:text-citi-heading transition-colors font-medium">
             About
           </Link>
-          <Link to="/dashboard" className="text-citi-muted hover:text-citi-heading transition-colors font-medium">
+          <Link to="/accounts" className="text-citi-muted hover:text-citi-heading transition-colors font-medium">
             Dashboard
           </Link>
 

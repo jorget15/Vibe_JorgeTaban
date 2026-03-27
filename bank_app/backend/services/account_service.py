@@ -51,9 +51,11 @@ def create_account(name, email, account_type, password=None):
         raise ValueError("accountType must be CHECKING or SAVINGS")
 
     user = user_repo.get_user_by_email(email)
-    if not user:
-        hashed = generate_password_hash(password) if password else None
-        user = user_repo.add_user(name, email, password_hash=hashed)
+    if user:
+        raise ValueError("An account with this email already exists. Please sign in.")
+
+    hashed = generate_password_hash(password) if password else None
+    user   = user_repo.add_user(name, email, password_hash=hashed)
 
     account = account_repo.add_account(user["user_id"], account_type)
     return {
@@ -307,6 +309,43 @@ def get_all_users():
         })
 
     return result
+
+
+def get_user_accounts(user_id):
+    """
+    Return all accounts belonging to a user.
+    Used by the accounts overview screen so the user can see and switch between accounts.
+    """
+    user = user_repo.get_user_by_id(user_id)
+    if not user:
+        raise ValueError("User not found")
+    accounts = account_repo.get_accounts_by_user_id(user_id)
+    return [
+        {
+            "accountId":   a["account_id"],
+            "accountType": a["account_type"],
+            "balance":     float(a["balance"])
+        }
+        for a in accounts
+    ]
+
+
+def add_account_to_user(user_id, account_type):
+    """
+    Open a new account for an already-registered user.
+    Called from the accounts overview screen when the user clicks 'Open New Account'.
+    """
+    if account_type not in ('CHECKING', 'SAVINGS'):
+        raise ValueError("accountType must be CHECKING or SAVINGS")
+    user = user_repo.get_user_by_id(user_id)
+    if not user:
+        raise ValueError("User not found")
+    account = account_repo.add_account(user_id, account_type)
+    return {
+        "accountId":   account["account_id"],
+        "accountType": account["account_type"],
+        "balance":     float(account["balance"])
+    }
 
 
 def get_transactions(account_id):

@@ -27,12 +27,18 @@ interface Props {
 
 const PAGE_SIZE = 15
 
-// Maps each backend transaction type to a Tailwind text color class
 const typeStyles: Record<string, string> = {
   DEPOSIT:      'text-green-600',
   WITHDRAW:     'text-citi-red',
   TRANSFER_OUT: 'text-citi-red',
   TRANSFER_IN:  'text-green-600',
+}
+
+const typeLabels: Record<string, string> = {
+  DEPOSIT:      'Deposit',
+  WITHDRAW:     'Withdrawal',
+  TRANSFER_OUT: 'Sent',
+  TRANSFER_IN:  'Received',
 }
 
 export default function TransactionDrawer({ open, onClose, transactions }: Props) {
@@ -102,10 +108,14 @@ export default function TransactionDrawer({ open, onClose, transactions }: Props
                 {visible.map((txn) => (
                   <li key={txn.id} className="px-6 py-4 flex justify-between items-center hover:bg-citi-surface transition-colors">
                     <div>
-                      <p className="text-citi-text text-sm font-medium">{txn.description}</p>
+                      <span className={`text-xs font-semibold uppercase tracking-wide ${typeStyles[txn.type]}`}>
+                        {typeLabels[txn.type]}
+                      </span>
+                      {txn.description && (
+                        <p className="text-citi-text text-sm mt-0.5">{txn.description}</p>
+                      )}
                       <p className="text-citi-muted text-xs mt-0.5">{txn.date}</p>
                     </div>
-                    {/* + for incoming money, − for outgoing */}
                     <span className={`font-semibold text-sm shrink-0 ml-4 ${typeStyles[txn.type]}`}>
                       {(txn.type === 'DEPOSIT' || txn.type === 'TRANSFER_IN') ? '+' : '−'}
                       {' '}${txn.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

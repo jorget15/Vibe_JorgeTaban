@@ -21,7 +21,7 @@
  *
  *   extraReducers is where we handle those three auto-dispatched actions.
  */
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
+import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit'
 import api from '../api'
 
 export type Role = 'user' | 'admin'
@@ -67,6 +67,11 @@ const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
+    // Switch the active account without re-authenticating.
+    // Called from AccountsOverview when the user clicks "Manage" on an account.
+    setActiveAccount(state, action: PayloadAction<number>) {
+      state.accountId = action.payload
+    },
     /* logout is synchronous — no API call needed, just wipe the local state.
      * The backend has no session to destroy because we don't use server-side
      * sessions; authentication state lives entirely in the Redux store. */
@@ -111,5 +116,5 @@ const authSlice = createSlice({
   },
 })
 
-export const { logout, clearError } = authSlice.actions
+export const { logout, clearError, setActiveAccount } = authSlice.actions
 export default authSlice.reducer

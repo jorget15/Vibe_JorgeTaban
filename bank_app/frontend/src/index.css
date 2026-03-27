@@ -5,8 +5,8 @@
    These live outside @theme so they can change at runtime.
    .dark (toggled on <html>) swaps the surface tokens; brand blues stay fixed. */
 :root {
-  --citi-surface: #F4F7FB;
-  --citi-card:    #FFFFFF;
+  --citi-surface: #e5e7eb;
+  --citi-card:    #f0efef;
   --citi-text:    #1E293B;
   --citi-muted:   #64748B;
   --citi-border:  #E2E8F0;
