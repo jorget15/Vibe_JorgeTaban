@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import type { RootState, AppDispatch } from '../store'
-import { setActiveAccount } from '../store/authSlice'
+import { setActiveAccount, logout } from '../store/authSlice'
 import api from '../api'
 
 interface AccountSummary {
@@ -36,6 +36,19 @@ export default function AccountsOverview() {
     navigate('/dashboard')
   }
 
+  async function handleDeleteSelf() {
+    if (!window.confirm('Are you sure you want to delete your profile? All your funds and transaction history will be lost. This cannot be undone.')) return
+    const accountId = accounts[0]?.accountId
+    if (!accountId) return
+    try {
+      await api.delete(`/accounts/${accountId}`)
+      dispatch(logout())
+      navigate('/signin')
+    } catch (err: any) {
+      toast.error(err.response?.data?.error ?? 'Could not close profile.')
+    }
+  }
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     setCreating(true)
@@ -56,9 +69,17 @@ export default function AccountsOverview() {
     <main className="max-w-2xl mx-auto px-6 py-12 space-y-8">
 
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-citi-heading tracking-tight">Your Accounts</h1>
-        <p className="text-citi-muted mt-1">Welcome back, {username}</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-citi-heading tracking-tight">Your Accounts</h1>
+          <p className="text-citi-muted mt-1">Welcome back, {username}</p>
+        </div>
+        <button
+          onClick={handleDeleteSelf}
+          className="text-citi-red text-sm hover:underline mt-1"
+        >
+          Delete profile
+        </button>
       </div>
 
       {/* Account list */}

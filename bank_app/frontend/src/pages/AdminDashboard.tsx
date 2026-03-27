@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'react-toastify'
 import { logout } from '../store/authSlice'
 import type { RootState } from '../store'
 import api from '../api'
@@ -23,7 +24,7 @@ const fmt = (n: number) =>
 export default function AdminDashboard() {
   const dispatch = useDispatch()
   const navigate = useNavigate()
-  const { username } = useSelector((state: RootState) => state.auth)
+  const { username, userId: adminUserId } = useSelector((state: RootState) => state.auth)
 
   const [users,    setUsers]    = useState<AdminUser[]>([])
   const [loading,  setLoading]  = useState(true)
@@ -42,6 +43,19 @@ export default function AdminDashboard() {
       .then(res => setUsers(res.data))
       .finally(() => setLoading(false))
   }, [])
+
+  async function handleDeactivate(user: AdminUser) {
+    if (!window.confirm(`Deactivate ${user.name}? They will no longer be able to log in.`)) return
+    const accountId = user.accounts[0]?.accountId
+    if (!accountId) return
+    try {
+      await api.delete(`/accounts/${accountId}`)
+      setUsers(prev => prev.map(u => u.userId === user.userId ? { ...u, isDeleted: true } : u))
+      toast.success(`${user.name} has been deactivated.`)
+    } catch (err: any) {
+      toast.error(err.response?.data?.error ?? 'Could not deactivate user.')
+    }
+  }
 
   function handleLogout() {
     dispatch(logout())
@@ -123,7 +137,7 @@ export default function AdminDashboard() {
                 <thead>
                   <tr className="border-b border-admin-border">
                     <th className="w-10" />
-                    {['ID', 'Name', 'Email', 'Balance', 'Role', 'Txns', 'Since'].map((h, i) => (
+                    {['ID', 'Name', 'Email', 'Balance', 'Role', 'Txns', 'Since', ''].map((h, i) => (
                       <th
                         key={h}
                         className={`px-6 py-3 text-admin-muted text-xs tracking-wider uppercase font-normal ${
@@ -184,6 +198,16 @@ export default function AdminDashboard() {
                           </td>
                           <td className="px-6 py-4 text-right text-admin-muted tabular-nums">{user.txnCount}</td>
                           <td className="px-6 py-4 text-right text-admin-muted">{user.createdAt}</td>
+                          <td className="px-4 py-4 text-center">
+                            {!user.isDeleted && user.userId !== adminUserId && user.accounts.length > 0 && (
+                              <button
+                                onClick={() => handleDeactivate(user)}
+                                className="text-admin-red hover:text-white transition-colors text-xs uppercase tracking-widest"
+                              >
+                                Deactivate
+                              </button>
+                            )}
+                          </td>
                         </tr>
 
                         {/* ── Collapsible account rows — one per account, aligned to parent columns ── */}
@@ -206,6 +230,7 @@ export default function AdminDashboard() {
                             <td className="px-6 py-2 text-right text-admin-muted text-xs">
                               {acct.createdAt}
                             </td>
+                            <td />
                           </tr>
                         ))}
                       </>
